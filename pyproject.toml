@@ -1,2 +1,14 @@
 [tool.uv.workspace]
 members = ["backend"]
+
+[tool.basedpyright]
+typeCheckingMode = "recommend"
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+extraPaths = ["backend"]
+
+[tool.typos.files]
+extend-exclude = [
+    "uv.lock",
+]
