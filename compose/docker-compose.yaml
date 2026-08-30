@@ -1,10 +1,64 @@
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.158.0
+    container_name: otel-collect-dev
     command: ["--config=/etc/otel-collector.yaml"]
     volumes:
-      - ./etc/collector/collector-config-dev.yaml:/etc/otel-collector.yaml
+      - ./etc/collector/collector-config-dev.yaml:/etc/otel-collector.yaml:ro
     ports:
       - 4317:4317
       - 4318:4318
       - 55679:55679  # http://localhost:55679/debug/servicez
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.2
+    container_name: es-dev
+    environment:
+      - discovery.type=single-node  # 单节点
+      - xpack.security.enabled=false  # 关闭安全认证
+      - xpack.license.self_generated.type=trial  # 生成试用版许可证，清除数据卷后刷新
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g  # 堆内存，ES 官方建议 -Xms 和 -Xmx 设成相等，否则 JVM 会在运行时扩/缩堆，带来额外 GC 停顿
+    ports:
+      - 9200:9200
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q status"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.5.2
+    container_name: es-kibana-dev
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      # 下面这串是 Kibana 内部加密 saved objects 用的 key，不是登录密码，
+      # 关闭 security 后不需要任何人输入它。生产请换成随机长串并通过 secret 注入。
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=dev_only_encryption_key_change_me_please_32chars  # 用它加密落盘的 saved objects（仪表盘、可视化、告警规则、API Key 等）
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - 5601:5601
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -I http://localhost:5601 | grep -q HTTP/1.1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+  es-apm-server:
+    image: docker.elastic.co/apm/apm-server:9.5.2
+    container_name: es-apm-dev
+    depends_on:
+      kibana:
+        condition: service_healthy
+    # 用 -E 把配置直接内联，免去额外挂载 apm-server.yml
+    command: >
+      -E apm-server.host=0.0.0.0:8200
+      -E output.elasticsearch.hosts=["http://elasticsearch:9200"]
+      -E apm-server.kibana.host=http://kibana:5601
+      -E apm-server.kibana.enabled=true
+      -E setup.kibana.host=http://kibana:5601
+    ports:
+      - 8200:8200
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8200/ | grep -q version"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
