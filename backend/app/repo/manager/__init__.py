@@ -46,6 +46,12 @@ class RepoManager:
 
         raise RuntimeError("❌ [RepoManager] Failed to connect to any backend")
 
+    async def init(self) -> None:
+        """初始化后端"""
+        await self.connect()
+        await self.backend.init()
+        logger.info(f"✅ [RepoManager] Initialized {type(self.backend).__name__}")
+
     async def close(self) -> None:
         """关闭后端连接"""
         await self.backend.close()

@@ -1,4 +1,4 @@
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, dsl
 from typing_extensions import override
 
 from app.config import settings
@@ -6,6 +6,10 @@ from app.repo.client.base import AsyncBaseClient
 
 
 class AsyncElasticsearchClient(AsyncBaseClient):
+    """Elasticsearch 客户端"""
+
+    CLIENT_ALIAS: str = "default"
+
     def __init__(self, client: AsyncElasticsearch | None = None):
         self._client: AsyncElasticsearch | None = client
 
@@ -22,6 +26,7 @@ class AsyncElasticsearchClient(AsyncBaseClient):
     def client(self) -> AsyncElasticsearch:
         if self._client is None:
             self._client = self._create_client()
+        dsl.async_connections.add_connection(self.CLIENT_ALIAS, self._client)
         return self._client
 
     @override
@@ -33,6 +38,7 @@ class AsyncElasticsearchClient(AsyncBaseClient):
     async def close(self) -> None:
         """关闭 Elasticsearch 客户端连接"""
         await self.client.close()
+        dsl.async_connections.remove_connection(self.CLIENT_ALIAS)
         self._client = None
 
     @override
