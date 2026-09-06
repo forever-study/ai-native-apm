@@ -13,6 +13,7 @@ from opentelemetry import trace
 
 from app.core.mcp import mcp_server
 from app.core.observability.otel import OTelInitializer, otel_initializer
+from app.repo import repo_manager
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,12 @@ def create_app(mcp_server: MCPServer, otel_initializer: OTelInitializer) -> Fast
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         try:
+            await repo_manager.init()
             async with mcp_server.session_manager.run():
                 yield
         finally:
             otel_initializer.stop()
+            await repo_manager.close()
 
     app = FastAPI(lifespan=lifespan)
     otel_initializer.setup(app)
@@ -43,7 +46,7 @@ def add(a: int, b: int) -> int:
 
 
 @app.get("/")
-def home() -> dict[str, str]:
+async def home() -> dict[str, str]:
     tracer = trace.get_tracer("hello world")
     with tracer.start_as_current_span("home"):
         logger.info("start_as_current_span")
