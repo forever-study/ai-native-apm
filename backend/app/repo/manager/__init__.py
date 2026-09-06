@@ -53,7 +53,9 @@ class RepoManager:
         logger.info(f"✅ [RepoManager] Initialized {type(self.backend).__name__}")
 
     async def close(self) -> None:
-        """关闭后端连接"""
+        """关闭后端连接（幂等：未连接时直接返回）"""
+        if self._backend is None:
+            return
         await self.backend.close()
         logger.info(
             f"✅ [RepoManager] Closed connection to backend {type(self.backend).__name__}"

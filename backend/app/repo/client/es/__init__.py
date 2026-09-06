@@ -26,7 +26,7 @@ class AsyncElasticsearchClient(AsyncBaseClient):
     def client(self) -> AsyncElasticsearch:
         if self._client is None:
             self._client = self._create_client()
-        dsl.async_connections.add_connection(self.CLIENT_ALIAS, self._client)
+            dsl.async_connections.add_connection(self.CLIENT_ALIAS, self._client)
         return self._client
 
     @override
